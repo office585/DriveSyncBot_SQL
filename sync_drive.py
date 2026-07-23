@@ -31,7 +31,16 @@ SQL_MAPPING = {
     "resrev_report": "1Kabe1R7ADsqtoVyRb-sgGead7k9lZWJs",
     "felhomatrac_2026": "19bo5GiU6lrPEgfrSbJrO74e7pWD9Ng7U",
     "szamlazz_hu_2026": "16KYmZhM-F08ZNHj-3VQf1TZXszHki1Cf"
-    # A jövőben ide adhatod hozzá a többi mappát is!
+}
+
+# ==============================================================================
+# OKOS FÜL MAPPING (SQL Táblanév -> Excel Fül Név vagy Index)
+# Ha egy táblanév nem szerepel itt, automatikusan az 1. fület (index: 0) olvassa be.
+# ==============================================================================
+SHEET_MAPPING = {
+    "payment_report": "Card payments",  # Pontos szöveges fül név
+    "payout_report": "Payouts",          # Pontos szöveges fül név
+    "resrev_report": 2                   # 3. fül (0-s indexeléssel: 0, 1, 2)
 }
 
 def get_drive_service():
@@ -102,19 +111,22 @@ def main():
                 logging.warning(f"Nem található Excel fájl ebben a mappában: [{table_name}] ({folder_id})")
                 continue
 
-            logging.info(f"Feldolgozás: [{table_name}] <-- Legfrissebb fájl: {file_name}")
+            # Meghatározzuk, hogy melyik fület kell beolvasni (alapértelmezett: 0, azaz az 1. fül)
+            sheet_to_load = SHEET_MAPPING.get(table_name, 0)
+
+            logging.info(f"Feldolgozás: [{table_name}] <-- Fájl: '{file_name}' | Kijelölt fül: '{sheet_to_load}'")
             
             # Excel letöltése a RAM memóriába
             request = service.files().get_media(fileId=file_id)
             excel_bytes = io.BytesIO(request.execute())
             
-            # Pandas beolvasás és üres oszlopok eldobása
-            df = pd.read_excel(excel_bytes)
+            # Pandas beolvasás a SPECIFIKUS FÜLRŐL és az üres oszlopok eldobása
+            df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
             df = df.dropna(how='all', axis=1)
 
             # Beírás az SQLite táblába
             df.to_sql(table_name, conn, if_exists="replace", index=False)
-            logging.info(f"  -> Tábla frissítve: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
+            logging.info(f"   -> Tábla sikeresen frissítve: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
 
         except Exception as e:
             logging.error(f"Hiba a(z) [{table_name}] feldolgozásakor: {e}")
