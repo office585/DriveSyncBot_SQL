@@ -19,7 +19,7 @@ LOCAL_DB_NAME = DESKTOP_DB_PATH if os.path.exists(r"C:\Users\User\Desktop") else
 TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 
 # ==============================================================================
-# MULTITENANT MAPPA MAPPING (7 HÁZ × 5 ADATTÍPUS = 35 DRIVE MAPPA ID)
+# MULTITENANT MAPPA MAPPING (A TE EXCEL FÁJLODBÓL KIOLVASVA, 100% PONTOSAN)
 # ==============================================================================
 HOUSES_MAPPING = {
     "athenaeum": {
@@ -32,7 +32,7 @@ HOUSES_MAPPING = {
     "buda_castle": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
         "felhomatrac_2026": "1xk3SOqhKWNPbRMkgZM1JleGwgYHN8p2K",
-        "payout_report": "1YW3v3__H92zsHrT1zQZrev9q9FsYYe23",
+        "payout_report": "1YW3v3__H92zsHrT1zQZreV9q9FsYYe23",
         "payment_report": "1SaF84GEvQlr8xN2R6KF1uOnhFayPVc_D",
         "resrev_report": "1XkgOWmQYlXFPp0saa6RJDnAOQIFE3TUA"
     },
@@ -41,13 +41,13 @@ HOUSES_MAPPING = {
         "felhomatrac_2026": "1fz1PwvGgmam-vZpg9SF3chn7s4ujTUYf",
         "payout_report": "1avEyXVFme4VXLLsopnmyLIcAwFkH6g0L",
         "payment_report": "1QD0ngN0Fa5vzmk7NrkszNsk3LjzV0DS3",
-        "resrev_report": "1JL8FmIUR_NLwTN4PLwaNfxomnqqO3Chy"
+        "resrev_report": "1JL8FmlUR_NLwTN4PLwaNfxomnqqO3Chy"
     },
     "central": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
         "felhomatrac_2026": "15W3dlP1DVk--0eOG1fq4W5giXx8L8_Fy",
-        "payout_report": "1u0IE84uJkrMNIswgHNXxtB7hFxhPIH2I",
-        "payment_report": "1TRgDr2i_JrE36GQAqqQ6xsTG_k4q6V0QL",
+        "payout_report": "1u0lE84uJkrMNlswgHNXxtB7hFxhPlH2I",
+        "payment_report": "1TRgDr2i_JrE36GQAqQ6xsTG_k4q6V0QL",
         "resrev_report": "105N_EKgndLbD-5IcHnbTLj0tVSTNzqO2"
     },
     "downtown": {
@@ -61,15 +61,15 @@ HOUSES_MAPPING = {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
         "felhomatrac_2026": "1WWJ3dhu1yw2Lfw3ZxqTqaRtLsjLmg1ac",
         "payout_report": "1hwWmPVt7aUiwHuOwTX0To8rF6fz2LzBb",
-        "payment_report": "1Igjazlli9Kxn807Nyl4N_5xOffObaXfl",
+        "payment_report": "1IgjazIli9Kxn807Nyl4N_5xOfFObaXfI",
         "resrev_report": "15nEFtJGFDVNuhRzYMa_H1L5dj8o2ROZG"
     },
     "amberlyn": {
         "szamlazz_hu_2026": "1jU3BiAy-iRgz3xvv0uFDu5WTeWqFFtj3",
         "felhomatrac_2026": "102qpagWkmb8j9NO7IU93D6qTVVYdBGKt",
-        "payout_report": "1QSxQSYv6vKByO4zp8-MswpSfkT5em7_",
-        "payment_report": "1K0SeRyibeikLr9giUWgOQr5YIxncEvr4",
-        "resrev_report": "1byLJxJlTywGljisMscG3FpO76ZCjo53q"
+        "payout_report": "1QSxQSYv6vKByO4zp8-MsswpSfkT5em7_",
+        "payment_report": "1K0SeRyibeikLr9giUWgOQr5YlxncEvr4",
+        "resrev_report": "1byLJxJlTywGIjisMscG3FpO76ZCjo53q"
     }
 }
 
@@ -136,6 +136,7 @@ def main():
         
     conn = sqlite3.connect(LOCAL_DB_NAME)
     total_tables_created = 0
+    missing_folders = []
 
     for house_key, reports in HOUSES_MAPPING.items():
         logging.info(f"\n--- 🏠 HÁZ FELDOLGOZÁSA: [{house_key.upper()}] ---")
@@ -147,6 +148,7 @@ def main():
                 file_id, file_name = get_latest_excel_file(service, folder_id)
                 if not file_id:
                     logging.warning(f"  ⚠️ Nem található Excel fájl ebben a mappában: [{table_name}] (Folder ID: {folder_id})")
+                    missing_folders.append(table_name)
                     continue
 
                 sheet_to_load = SHEET_MAPPING.get(report_type, 0)
@@ -172,7 +174,9 @@ def main():
 
     conn.close()
 
-    logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} DB TÁBLA LÉTREHOZVA ===")
+    logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} / 35 TÁBLA SIKERESEN LÉTREHOZVA ===")
+    if missing_folders:
+        logging.info(f"Üres/Hiányzó mappák listája: {missing_folders}")
 
     logging.info("=== SQLITE FÁJL FELTÖLTÉSE A GOOGLE DRIVE CÉLMAP PÁBA ===")
     try:
