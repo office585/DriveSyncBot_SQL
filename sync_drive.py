@@ -11,11 +11,6 @@ from googleapiclient.http import MediaFileUpload
 # Naplózás beállítása
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ==============================================================================
-# BIZTONSÁGI BEÁLLÍTÁS:
-# A Google API JSON kulcsot a 'GDRIVE_SERVICE_ACCOUNT_JSON' környezeti változó tartalmazza.
-# ==============================================================================
-
 # CÉLMAPPA ID (Ahova a kész ceges_adatok.db fájl mentésre kerül)
 TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 
@@ -23,7 +18,7 @@ TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 LOCAL_DB_NAME = "ceges_adatok.db"
 
 # ==============================================================================
-# 1. MULTITENANT MAPPA MAPPING (7 HÁZ × 5 ADATTÍPUS = 35 DRIVE MAPPA ID)
+# MULTITENANT MAPPA MAPPING (7 HÁZ × 5 ADATTÍPUS = 35 DRIVE MAPPA ID)
 # ==============================================================================
 HOUSES_MAPPING = {
     "athenaeum": {
@@ -65,7 +60,7 @@ HOUSES_MAPPING = {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
         "felhomatrac_2026": "1WWJ3dhu1yw2Lfw3ZxqTqaRtLsjLmg1ac",
         "payout_report": "1hwWmPVt7aUiwHuOwTX0To8rF6fz2LzBb",
-        "payment_report": "1Igjazlli9Kxn807Nyl4N_5xOfFObaXfl",
+        "payment_report": "1Igjazlli9Kxn807Nyl4N_5xOffObaXfl",
         "resrev_report": "15nEFtJGFDVNuhRzYMa_H1L5dj8o2ROZG"
     },
     "amberlyn": {
@@ -77,17 +72,13 @@ HOUSES_MAPPING = {
     }
 }
 
-# ==============================================================================
-# 2. UNIVERZÁLIS FÜL MAPPING (Minden cégre érvényes a saját adattípusánál)
-# ==============================================================================
 SHEET_MAPPING = {
-    "payment_report": "Card payments",  # Szöveges fül név
-    "payout_report": "Payouts",          # Szöveges fül név
-    "resrev_report": 2                   # 3. fül (0-s indexeléssel: 0, 1, 2)
+    "payment_report": "Card payments",
+    "payout_report": "Payouts",
+    "resrev_report": 2
 }
 
 def get_drive_service():
-    """Autentikáció a GitHub Secrets-be beállított JSON kulccsal."""
     gdrive_json_str = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
     if not gdrive_json_str:
         raise ValueError("HIBA: A 'GDRIVE_SERVICE_ACCOUNT_JSON' környezeti változó hiányzik!")
@@ -100,7 +91,6 @@ def get_drive_service():
     return build('drive', 'v3', credentials=creds)
 
 def get_latest_excel_file(service, folder_id):
-    """Megkeresi a legfrissebb Excel fájlt az adott Drive mappában."""
     query = f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel') and trashed=false"
     results = service.files().list(
         q=query, 
@@ -115,7 +105,6 @@ def get_latest_excel_file(service, folder_id):
     return files[0]['id'], files[0]['name']
 
 def upload_or_update_db(service, local_file_path, target_folder_id):
-    """Megkeresi a célmappában a ceges_adatok.db fájlt: ha van, frissíti, ha nincs, feltölti."""
     query = f"'{target_folder_id}' in parents and name='{LOCAL_DB_NAME}' and trashed=false"
     results = service.files().list(q=query, fields="files(id)").execute()
     existing_files = results.get('files', [])
@@ -140,15 +129,12 @@ def main():
         logging.error(f"Autentikációs hiba: {e}")
         return
 
-    # Ideiglenes helyi SQLite adatbázis törlése/létrehozása a konténerben
     if os.path.exists(LOCAL_DB_NAME):
         os.remove(LOCAL_DB_NAME)
         
     conn = sqlite3.connect(LOCAL_DB_NAME)
-
     total_tables_created = 0
 
-    # DUPLA CIKLUS: Cég (Ház) -> Adattípus
     for house_key, reports in HOUSES_MAPPING.items():
         logging.info(f"\n--- 🏠 HÁZ FELDOLGOZÁSA: [{house_key.upper()}] ---")
         
@@ -161,20 +147,21 @@ def main():
                     logging.warning(f"  ⚠️ Nem található Excel fájl ebben a mappában: [{table_name}] (Folder ID: {folder_id})")
                     continue
 
-                # Meghatározzuk, hogy melyik fület kell beolvasni (alapértelmezett: 0, azaz az 1. fül)
                 sheet_to_load = SHEET_MAPPING.get(report_type, 0)
 
                 logging.info(f"  ➜ Feldolgozás: [{table_name}] <-- Fájl: '{file_name}' | Fül: '{sheet_to_load}'")
                 
-                # Excel letöltése a RAM memóriába
                 request = service.files().get_media(fileId=file_id)
                 excel_bytes = io.BytesIO(request.execute())
                 
-                # Pandas beolvasás a specifikus fülről és üres oszlopok eldobása
-                df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
+                # Okos beolvasás (ha a fül neve eltérne, az 1. fülre lép vissza)
+                try:
+                    df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
+                except Exception:
+                    df = pd.read_excel(excel_bytes, sheet_name=0)
+
                 df = df.dropna(how='all', axis=1)
 
-                # Beírás az SQLite táblába
                 df.to_sql(table_name, conn, if_exists="replace", index=False)
                 total_tables_created += 1
                 logging.info(f"     ✔ Tábla sikeresen frissítve: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
@@ -186,7 +173,6 @@ def main():
 
     logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} DB TÁBLA LÉTREHOZVA ===")
 
-    # Kész .db fájl feltöltése/frissítése a Drive célmappában
     logging.info("=== SQLITE FÁJL FELTÖLTÉSE A GOOGLE DRIVE CÉLMAP PÁBA ===")
     try:
         upload_or_update_db(service, LOCAL_DB_NAME, TARGET_DB_FOLDER_ID)
