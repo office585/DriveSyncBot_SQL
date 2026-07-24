@@ -12,10 +12,8 @@ from googleapiclient.http import MediaFileUpload
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # ==============================================================================
-# BIZTONSÁGI FIGYELMEZTETÉS:
-# A Google API JSON kulcsot NE tedd be ide a kódba! 
-# A kód a 'GDRIVE_SERVICE_ACCOUNT_JSON' nevű környezeti változóból olvassa be, 
-# amit a GitHub Secrets-ben kell beállítanod.
+# BIZTONSÁGI BEÁLLÍTÁS:
+# A Google API JSON kulcsot a 'GDRIVE_SERVICE_ACCOUNT_JSON' környezeti változó tartalmazza.
 # ==============================================================================
 
 # CÉLMAPPA ID (Ahova a kész ceges_adatok.db fájl mentésre kerül)
@@ -24,22 +22,67 @@ TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 # CÉL ADATBÁZIS FÁJLNEVE
 LOCAL_DB_NAME = "ceges_adatok.db"
 
-# MAPPA MAPPING (SQL Táblanév -> Google Drive Mappa ID)
-SQL_MAPPING = {
-    "payment_report": "1KGd5i9yH9UxJw6yTSveZBpbwwaS3Hj6_",
-    "payout_report": "11HFdIpgeEIPKR2hAguigkhCVa7aYOOYe",
-    "resrev_report": "1Kabe1R7ADsqtoVyRb-sgGead7k9lZWJs",
-    "felhomatrac_2026": "19bo5GiU6lrPEgfrSbJrO74e7pWD9Ng7U",
-    "szamlazz_hu_2026": "16KYmZhM-F08ZNHj-3VQf1TZXszHki1Cf"
+# ==============================================================================
+# 1. MULTITENANT MAPPA MAPPING (7 HÁZ × 5 ADATTÍPUS = 35 DRIVE MAPPA ID)
+# ==============================================================================
+HOUSES_MAPPING = {
+    "athenaeum": {
+        "szamlazz_hu_2026": "16KYmZhM-F08ZNHj-3VQf1TZXszHki1Cf",
+        "felhomatrac_2026": "19bo5GiU6lrPEgfrSbJrO74e7pWD9Ng7U",
+        "payout_report": "11HFdIpgeEIPKR2hAguigkhCVa7aYOOYe",
+        "payment_report": "1KGd5i9yH9UxJw6yTSveZBpbwwaS3Hj6_",
+        "resrev_report": "1Kabe1R7ADsqtoVyRb-sgGead7k9lZWJs"
+    },
+    "buda_castle": {
+        "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
+        "felhomatrac_2026": "1xk3SOqhKWNPbRMkgZM1JleGwgYHN8p2K",
+        "payout_report": "1YW3v3__H92zsHrT1zQZrev9q9FsYYe23",
+        "payment_report": "1SaF84GEvQlr8xN2R6KF1uOnhFayPVc_D",
+        "resrev_report": "1XkgOWmQYlXFPp0saa6RJDnAOQIFE3TUA"
+    },
+    "soho": {
+        "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
+        "felhomatrac_2026": "1fz1PwvGgmam-vZpg9SF3chn7s4ujTUYf",
+        "payout_report": "1avEyXVFme4VXLLsopnmyLIcAwFkH6g0L",
+        "payment_report": "1QD0ngN0Fa5vzmk7NrkszNsk3LjzV0DS3",
+        "resrev_report": "1JL8FmIUR_NLwTN4PLwaNfxomnqqO3Chy"
+    },
+    "central": {
+        "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
+        "felhomatrac_2026": "15W3dlP1DVk--0eOG1fq4W5giXx8L8_Fy",
+        "payout_report": "1u0IE84uJkrMNIswgHNXxtB7hFxhPIH2I",
+        "payment_report": "1TRgDr2i_JrE36GQAqqQ6xsTG_k4q6V0QL",
+        "resrev_report": "105N_EKgndLbD-5IcHnbTLj0tVSTNzqO2"
+    },
+    "downtown": {
+        "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
+        "felhomatrac_2026": "1HjE1CMPEIYHqG6HA7aPc5OqG0GAfHdXU",
+        "payout_report": "1aFa3J4vAYAenmM2y9OwHrLfoM4eTM6E4",
+        "payment_report": "1VVu8IXHmx9kFuo82Z-h7mvdvrrYfAiYQ",
+        "resrev_report": "1A3n-svd06K3ML0SW59fnGlgpvFaOWH-m"
+    },
+    "vintage": {
+        "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
+        "felhomatrac_2026": "1WWJ3dhu1yw2Lfw3ZxqTqaRtLsjLmg1ac",
+        "payout_report": "1hwWmPVt7aUiwHuOwTX0To8rF6fz2LzBb",
+        "payment_report": "1Igjazlli9Kxn807Nyl4N_5xOfFObaXfl",
+        "resrev_report": "15nEFtJGFDVNuhRzYMa_H1L5dj8o2ROZG"
+    },
+    "amberlyn": {
+        "szamlazz_hu_2026": "1jU3BiAy-iRgz3xvv0uFDu5WTeWqFFtj3",
+        "felhomatrac_2026": "102qpagWkmb8j9NO7IU93D6qTVVYdBGKt",
+        "payout_report": "1QSxQSYv6vKByO4zp8-MswpSfkT5em7_",
+        "payment_report": "1K0SeRyibeikLr9giUWgOQr5YIxncEvr4",
+        "resrev_report": "1byLJxJlTywGljisMscG3FpO76ZCjo53q"
+    }
 }
 
 # ==============================================================================
-# OKOS FÜL MAPPING (SQL Táblanév -> Excel Fül Név vagy Index)
-# Ha egy táblanév nem szerepel itt, automatikusan az 1. fület (index: 0) olvassa be.
+# 2. UNIVERZÁLIS FÜL MAPPING (Minden cégre érvényes a saját adattípusánál)
 # ==============================================================================
 SHEET_MAPPING = {
-    "payment_report": "Card payments",  # Pontos szöveges fül név
-    "payout_report": "Payouts",          # Pontos szöveges fül név
+    "payment_report": "Card payments",  # Szöveges fül név
+    "payout_report": "Payouts",          # Szöveges fül név
     "resrev_report": 2                   # 3. fül (0-s indexeléssel: 0, 1, 2)
 }
 
@@ -89,7 +132,7 @@ def upload_or_update_db(service, local_file_path, target_folder_id):
         service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
 def main():
-    logging.info("=== DRIVESYNCBOT INDÍTÁSA ===")
+    logging.info("=== MULTITENANT DRIVESYNCBOT INDÍTÁSA ===")
     
     try:
         service = get_drive_service()
@@ -103,35 +146,45 @@ def main():
         
     conn = sqlite3.connect(LOCAL_DB_NAME)
 
-    # Végigmegyünk a Drive mappákon
-    for table_name, folder_id in SQL_MAPPING.items():
-        try:
-            file_id, file_name = get_latest_excel_file(service, folder_id)
-            if not file_id:
-                logging.warning(f"Nem található Excel fájl ebben a mappában: [{table_name}] ({folder_id})")
-                continue
+    total_tables_created = 0
 
-            # Meghatározzuk, hogy melyik fület kell beolvasni (alapértelmezett: 0, azaz az 1. fül)
-            sheet_to_load = SHEET_MAPPING.get(table_name, 0)
-
-            logging.info(f"Feldolgozás: [{table_name}] <-- Fájl: '{file_name}' | Kijelölt fül: '{sheet_to_load}'")
+    # DUPLA CIKLUS: Cég (Ház) -> Adattípus
+    for house_key, reports in HOUSES_MAPPING.items():
+        logging.info(f"\n--- 🏠 HÁZ FELDOLGOZÁSA: [{house_key.upper()}] ---")
+        
+        for report_type, folder_id in reports.items():
+            table_name = f"{house_key}_{report_type}"
             
-            # Excel letöltése a RAM memóriába
-            request = service.files().get_media(fileId=file_id)
-            excel_bytes = io.BytesIO(request.execute())
-            
-            # Pandas beolvasás a SPECIFIKUS FÜLRŐL és az üres oszlopok eldobása
-            df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
-            df = df.dropna(how='all', axis=1)
+            try:
+                file_id, file_name = get_latest_excel_file(service, folder_id)
+                if not file_id:
+                    logging.warning(f"  ⚠️ Nem található Excel fájl ebben a mappában: [{table_name}] (Folder ID: {folder_id})")
+                    continue
 
-            # Beírás az SQLite táblába
-            df.to_sql(table_name, conn, if_exists="replace", index=False)
-            logging.info(f"   -> Tábla sikeresen frissítve: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
+                # Meghatározzuk, hogy melyik fület kell beolvasni (alapértelmezett: 0, azaz az 1. fül)
+                sheet_to_load = SHEET_MAPPING.get(report_type, 0)
 
-        except Exception as e:
-            logging.error(f"Hiba a(z) [{table_name}] feldolgozásakor: {e}")
+                logging.info(f"  ➜ Feldolgozás: [{table_name}] <-- Fájl: '{file_name}' | Fül: '{sheet_to_load}'")
+                
+                # Excel letöltése a RAM memóriába
+                request = service.files().get_media(fileId=file_id)
+                excel_bytes = io.BytesIO(request.execute())
+                
+                # Pandas beolvasás a specifikus fülről és üres oszlopok eldobása
+                df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
+                df = df.dropna(how='all', axis=1)
+
+                # Beírás az SQLite táblába
+                df.to_sql(table_name, conn, if_exists="replace", index=False)
+                total_tables_created += 1
+                logging.info(f"     ✔ Tábla sikeresen frissítve: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
+
+            except Exception as e:
+                logging.error(f"  ❌ Hiba a(z) [{table_name}] feldolgozásakor: {e}")
 
     conn.close()
+
+    logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} DB TÁBLA LÉTREHOZVA ===")
 
     # Kész .db fájl feltöltése/frissítése a Drive célmappában
     logging.info("=== SQLITE FÁJL FELTÖLTÉSE A GOOGLE DRIVE CÉLMAP PÁBA ===")
