@@ -11,11 +11,12 @@ from googleapiclient.http import MediaFileUpload
 # Naplózás beállítása
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# CÉLMAPPA ID (Ahova a kész ceges_adatok.db fájl mentésre kerül)
-TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
+# CÉL ADATBÁZIS ÚTVONAL (Ha létezik az Asztal, oda menti közvetlenül)
+DESKTOP_DB_PATH = r"C:\Users\User\Desktop\ceges_adatok.db"
+LOCAL_DB_NAME = DESKTOP_DB_PATH if os.path.exists(r"C:\Users\User\Desktop") else "ceges_adatok.db"
 
-# CÉL ADATBÁZIS FÁJLNEVE
-LOCAL_DB_NAME = "ceges_adatok.db"
+# CÉLMAPPA ID a Google Drive-on
+TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 
 # ==============================================================================
 # MULTITENANT MAPPA MAPPING (7 HÁZ × 5 ADATTÍPUS = 35 DRIVE MAPPA ID)
@@ -105,7 +106,7 @@ def get_latest_excel_file(service, folder_id):
     return files[0]['id'], files[0]['name']
 
 def upload_or_update_db(service, local_file_path, target_folder_id):
-    query = f"'{target_folder_id}' in parents and name='{LOCAL_DB_NAME}' and trashed=false"
+    query = f"'{target_folder_id}' in parents and name='ceges_adatok.db' and trashed=false"
     results = service.files().list(q=query, fields="files(id)").execute()
     existing_files = results.get('files', [])
 
@@ -117,7 +118,7 @@ def upload_or_update_db(service, local_file_path, target_folder_id):
         service.files().update(fileId=file_id, media_body=media).execute()
     else:
         logging.info("Új adatbázisfájl feltöltése a célmappába...")
-        file_metadata = {'name': LOCAL_DB_NAME, 'parents': [target_folder_id]}
+        file_metadata = {'name': 'ceges_adatok.db', 'parents': [target_folder_id]}
         service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
 def main():
@@ -130,7 +131,8 @@ def main():
         return
 
     if os.path.exists(LOCAL_DB_NAME):
-        os.remove(LOCAL_DB_NAME)
+        try: os.remove(LOCAL_DB_NAME)
+        except Exception: pass
         
     conn = sqlite3.connect(LOCAL_DB_NAME)
     total_tables_created = 0
@@ -154,7 +156,6 @@ def main():
                 request = service.files().get_media(fileId=file_id)
                 excel_bytes = io.BytesIO(request.execute())
                 
-                # Okos beolvasás (ha a fül neve eltérne, az 1. fülre lép vissza)
                 try:
                     df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
                 except Exception:
