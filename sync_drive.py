@@ -19,7 +19,7 @@ LOCAL_DB_NAME = DESKTOP_DB_PATH if os.path.exists(r"C:\Users\User\Desktop") else
 TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 
 # ==============================================================================
-# MULTITENANT MAPPA MAPPING (35 PONTOS DRIVE MAPPA ID)
+# MULTITENANT MAPPA MAPPING (35 PONTOS DRIVE MAPPA ID A TE EXCELED ALAPJÁN)
 # ==============================================================================
 HOUSES_MAPPING = {
     "athenaeum": {
@@ -32,7 +32,7 @@ HOUSES_MAPPING = {
     "buda_castle": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
         "felhomatrac_2026": "1xk3SOqhKWNPbRMkgZM1JleGwgYHN8p2K",
-        "payout_report": "1YW3v3__H92zsHrT1zQZrev9q9FsYYe23",
+        "payout_report": "1YW3v3__H92zsHrT1zQZreV9q9FsYYe23", # 🟢 JAVÍTVA: Nagy 'V' betű!
         "payment_report": "1SaF84GEvQlr8xN2R6KF1uOnhFayPVc_D",
         "resrev_report": "1XkgOWmQYlXFPp0saa6RJDnAOQIFE3TUA"
     },
@@ -67,7 +67,7 @@ HOUSES_MAPPING = {
     "amberlyn": {
         "szamlazz_hu_2026": "1jU3BiAy-iRgz3xvv0uFDu5WTeWqFFtj3",
         "felhomatrac_2026": "102qpagWkmb8j9NO7IU93D6qTVVYdBGKt",
-        "payout_report": "1QSxQSYv6vKByO4zp8-MswpSfkT5em7_",
+        "payout_report": "1QSxQSYv6vKByO4zp8-MsswpSfkT5em7_", # 🟢 JAVÍTVA: Dupla 's' betű (Msswp)!
         "payment_report": "1K0SeRyibeikLr9giUWgOQr5YlxncEvr4",
         "resrev_report": "1byLJxJlTywGIjisMscG3FpO76ZCjo53q"
     }
@@ -114,7 +114,6 @@ def download_file_bytes(service, file_id, mime_type):
     return io.BytesIO(request.execute())
 
 def load_excel_smart(excel_bytes, report_type):
-    """🟢 OKOS FÜL-KERESŐ: Payouts kezdetű fül megkeresése -> Ha nincs, a 2. FÜL (index 1) betöltése!"""
     excel_bytes.seek(0)
     try:
         xl = pd.ExcelFile(excel_bytes)
@@ -124,7 +123,7 @@ def load_excel_smart(excel_bytes, report_type):
         try:
             return pd.read_csv(excel_bytes, sep=None, engine='python'), "CSV_Format"
         except Exception:
-            raise ValueError(f"Sikertelen beolvasás (sem Excel, sem CSV formátum): {e}")
+            raise ValueError(f"Sikertelen beolvasás: {e}")
 
     if not sheet_names:
         excel_bytes.seek(0)
@@ -143,7 +142,6 @@ def load_excel_smart(excel_bytes, report_type):
         if matched:
             target_sheet = matched
         else:
-            # 🟢 HA NINCS 'Payout...' KEZDETŰ FÜL, A 2. FÜLET (index: 1) TÖLTI BE!
             if len(sheet_names) >= 2:
                 target_sheet = sheet_names[1]
             else:
@@ -220,11 +218,9 @@ def main():
                     continue
 
                 excel_bytes = download_file_bytes(service, file_id, mime_type)
-                
-                # 🟢 SMART EXCEL READ
                 df, used_sheet = load_excel_smart(excel_bytes, report_type)
 
-                logging.info(f"  ➜ Megtalálva: [{table_name}] <-- Fájl: '{file_name}' | Beolvasott Fül: '{used_sheet}'")
+                logging.info(f"  ➜ Megtalálva: [{table_name}] <-- Fájl: '{file_name}' | Fül: '{used_sheet}'")
 
                 df = df.dropna(how='all', axis=1)
                 df.to_sql(table_name, conn, if_exists="replace", index=False)
