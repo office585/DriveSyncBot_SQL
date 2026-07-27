@@ -73,12 +73,6 @@ HOUSES_MAPPING = {
     }
 }
 
-SHEET_MAPPING = {
-    "payment_report": "Card payments",
-    "payout_report": "Payouts",
-    "resrev_report": 2
-}
-
 def get_drive_service():
     gdrive_json_str = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
     if not gdrive_json_str:
@@ -92,7 +86,6 @@ def get_drive_service():
     return build('drive', 'v3', credentials=creds)
 
 def get_latest_excel_file(service, folder_id):
-    """🟢 KOTORÁSSZA A MAPPÁT: Nem korlátozzuk mimeType-ra a lekérdezést, így minden fájlt megtalál!"""
     query = f"'{folder_id}' in parents and trashed=false"
     results = service.files().list(
         q=query, 
@@ -108,25 +101,77 @@ def get_latest_excel_file(service, folder_id):
     for f in files:
         fname = f.get('name', '').lower()
         mtype = f.get('mimeType', '').lower()
-        
-        # Elfogadunk minden tetszőleges kiterjesztésű vagy típusú táblázatot
         if fname.endswith('.xlsx') or fname.endswith('.xls') or fname.endswith('.csv') or 'spreadsheet' in mtype or 'excel' in mtype or 'octet-stream' in mtype:
             return f['id'], f['name'], mtype
             
-    # Ha van bármilyen fájl a mappában, biztonsági alapon a legfrissebbet visszaadjuk
     return files[0]['id'], files[0]['name'], files[0].get('mimeType', '')
 
 def download_file_bytes(service, file_id, mime_type):
-    """Intelligens letöltés: Google Sheets esetén Excelként exportálja, egyébként nyersen letölti."""
     if 'google-apps.spreadsheet' in mime_type:
-        request = service.files().export_media(
-            fileId=file_id, 
-            mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        request = service.files().export_media(fileId=file_id, mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     else:
         request = service.files().get_media(fileId=file_id)
-        
     return io.BytesIO(request.execute())
+
+def load_excel_smart(excel_bytes, report_type):
+    """🟢 OKOS FÜL-KERESŐ: Payouts kezdetű fül megkeresése -> Ha nincs, a 2. FÜL (index 1) betöltése!"""
+    excel_bytes.seek(0)
+    try:
+        xl = pd.ExcelFile(excel_bytes)
+        sheet_names = xl.sheet_names
+    except Exception as e:
+        excel_bytes.seek(0)
+        try:
+            return pd.read_csv(excel_bytes, sep=None, engine='python'), "CSV_Format"
+        except Exception:
+            raise ValueError(f"Sikertelen beolvasás (sem Excel, sem CSV formátum): {e}")
+
+    if not sheet_names:
+        excel_bytes.seek(0)
+        return pd.read_excel(excel_bytes, sheet_name=0), "Sheet_0"
+
+    target_sheet = sheet_names[0]
+
+    if report_type == "payout_report":
+        matched = None
+        for s in sheet_names:
+            s_clean = str(s).strip().lower()
+            if s_clean.startswith("payout"):
+                matched = s
+                break
+        
+        if matched:
+            target_sheet = matched
+        else:
+            # 🟢 HA NINCS 'Payout...' KEZDETŰ FÜL, A 2. FÜLET (index: 1) TÖLTI BE!
+            if len(sheet_names) >= 2:
+                target_sheet = sheet_names[1]
+            else:
+                target_sheet = sheet_names[0]
+
+    elif report_type == "payment_report":
+        matched = None
+        for s in sheet_names:
+            s_clean = str(s).strip().lower()
+            if "card payment" in s_clean or s_clean.startswith("payment") or "card" in s_clean:
+                matched = s
+                break
+        if matched:
+            target_sheet = matched
+        else:
+            target_sheet = sheet_names[0]
+
+    elif report_type == "resrev_report":
+        if len(sheet_names) >= 3:
+            target_sheet = sheet_names[2]
+        elif len(sheet_names) >= 2:
+            target_sheet = sheet_names[1]
+        else:
+            target_sheet = sheet_names[0]
+
+    excel_bytes.seek(0)
+    df = pd.read_excel(excel_bytes, sheet_name=target_sheet)
+    return df, str(target_sheet)
 
 def upload_or_update_db(service, local_file_path, target_folder_id):
     query = f"'{target_folder_id}' in parents and name='ceges_adatok.db' and trashed=false"
@@ -170,23 +215,18 @@ def main():
             try:
                 file_id, file_name, mime_type = get_latest_excel_file(service, folder_id)
                 if not file_id:
-                    logging.warning(f"  ⚠️ ÜRES MAPPA! Nem található fájl ebben a mappában: [{table_name}] (Folder ID: {folder_id})")
+                    logging.warning(f"  ⚠️ Nem található fájl a mappában: [{table_name}] (Folder ID: {folder_id})")
                     missing_folders.append(table_name)
                     continue
 
-                sheet_to_load = SHEET_MAPPING.get(report_type, 0)
-
-                logging.info(f"  ➜ Megtalálva: [{table_name}] <-- Fájl: '{file_name}' | Fül: '{sheet_to_load}'")
-                
                 excel_bytes = download_file_bytes(service, file_id, mime_type)
                 
-                try:
-                    df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
-                except Exception:
-                    df = pd.read_excel(excel_bytes, sheet_name=0)
+                # 🟢 SMART EXCEL READ
+                df, used_sheet = load_excel_smart(excel_bytes, report_type)
+
+                logging.info(f"  ➜ Megtalálva: [{table_name}] <-- Fájl: '{file_name}' | Beolvasott Fül: '{used_sheet}'")
 
                 df = df.dropna(how='all', axis=1)
-
                 df.to_sql(table_name, conn, if_exists="replace", index=False)
                 total_tables_created += 1
                 logging.info(f"     ✔ SQL Tábla sikeresen létrehozva: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
