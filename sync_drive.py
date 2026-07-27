@@ -19,7 +19,7 @@ LOCAL_DB_NAME = DESKTOP_DB_PATH if os.path.exists(r"C:\Users\User\Desktop") else
 TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 
 # ==============================================================================
-# MULTITENANT MAPPA MAPPING (A TE EXCEL FÁJLODBÓL KIOLVASVA, 100% PONTOSAN)
+# MULTITENANT MAPPA MAPPING (35 PONTOS DRIVE MAPPA ID)
 # ==============================================================================
 HOUSES_MAPPING = {
     "athenaeum": {
@@ -32,7 +32,7 @@ HOUSES_MAPPING = {
     "buda_castle": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
         "felhomatrac_2026": "1xk3SOqhKWNPbRMkgZM1JleGwgYHN8p2K",
-        "payout_report": "1YW3v3__H92zsHrT1zQZreV9q9FsYYe23",
+        "payout_report": "1YW3v3__H92zsHrT1zQZrev9q9FsYYe23",
         "payment_report": "1SaF84GEvQlr8xN2R6KF1uOnhFayPVc_D",
         "resrev_report": "1XkgOWmQYlXFPp0saa6RJDnAOQIFE3TUA"
     },
@@ -45,7 +45,7 @@ HOUSES_MAPPING = {
     },
     "central": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "15W3dlP1DVk--0eOG1fq4W5giXx8L8_Fy",
+        "felhomatrac_2026": "1OlJCdki0z-TC1lrewUrL4f0nPzGAbpwO", # 🟢 PONTOS CENTRAL ID
         "payout_report": "1u0lE84uJkrMNlswgHNXxtB7hFxhPlH2I",
         "payment_report": "1TRgDr2i_JrE36GQAqQ6xsTG_k4q6V0QL",
         "resrev_report": "105N_EKgndLbD-5IcHnbTLj0tVSTNzqO2"
@@ -67,7 +67,7 @@ HOUSES_MAPPING = {
     "amberlyn": {
         "szamlazz_hu_2026": "1jU3BiAy-iRgz3xvv0uFDu5WTeWqFFtj3",
         "felhomatrac_2026": "102qpagWkmb8j9NO7IU93D6qTVVYdBGKt",
-        "payout_report": "1QSxQSYv6vKByO4zp8-MsswpSfkT5em7_",
+        "payout_report": "1QSxQSYv6vKByO4zp8-MswpSfkT5em7_",
         "payment_report": "1K0SeRyibeikLr9giUWgOQr5YlxncEvr4",
         "resrev_report": "1byLJxJlTywGIjisMscG3FpO76ZCjo53q"
     }
