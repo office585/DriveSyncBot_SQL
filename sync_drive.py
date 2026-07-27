@@ -45,7 +45,7 @@ HOUSES_MAPPING = {
     },
     "central": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "1OlJCdki0z-TC1lrewUrL4f0nPzGAbpwO", # 🟢 PONTOS CENTRAL ID
+        "felhomatrac_2026": "1OlJCdki0z-TC1lrewUrL4f0nPzGAbpwO",
         "payout_report": "1u0lE84uJkrMNlswgHNXxtB7hFxhPlH2I",
         "payment_report": "1TRgDr2i_JrE36GQAqQ6xsTG_k4q6V0QL",
         "resrev_report": "105N_EKgndLbD-5IcHnbTLj0tVSTNzqO2"
@@ -92,18 +92,41 @@ def get_drive_service():
     return build('drive', 'v3', credentials=creds)
 
 def get_latest_excel_file(service, folder_id):
-    query = f"'{folder_id}' in parents and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel') and trashed=false"
+    """🟢 KOTORÁSSZA A MAPPÁT: Nem korlátozzuk mimeType-ra a lekérdezést, így minden fájlt megtalál!"""
+    query = f"'{folder_id}' in parents and trashed=false"
     results = service.files().list(
         q=query, 
         orderBy="modifiedTime desc", 
-        pageSize=1, 
-        fields="files(id, name, modifiedTime)"
+        pageSize=50, 
+        fields="files(id, name, mimeType, modifiedTime)"
     ).execute()
     
     files = results.get('files', [])
     if not files:
-        return None, None
-    return files[0]['id'], files[0]['name']
+        return None, None, None
+        
+    for f in files:
+        fname = f.get('name', '').lower()
+        mtype = f.get('mimeType', '').lower()
+        
+        # Elfogadunk minden tetszőleges kiterjesztésű vagy típusú táblázatot
+        if fname.endswith('.xlsx') or fname.endswith('.xls') or fname.endswith('.csv') or 'spreadsheet' in mtype or 'excel' in mtype or 'octet-stream' in mtype:
+            return f['id'], f['name'], mtype
+            
+    # Ha van bármilyen fájl a mappában, biztonsági alapon a legfrissebbet visszaadjuk
+    return files[0]['id'], files[0]['name'], files[0].get('mimeType', '')
+
+def download_file_bytes(service, file_id, mime_type):
+    """Intelligens letöltés: Google Sheets esetén Excelként exportálja, egyébként nyersen letölti."""
+    if 'google-apps.spreadsheet' in mime_type:
+        request = service.files().export_media(
+            fileId=file_id, 
+            mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    else:
+        request = service.files().get_media(fileId=file_id)
+        
+    return io.BytesIO(request.execute())
 
 def upload_or_update_db(service, local_file_path, target_folder_id):
     query = f"'{target_folder_id}' in parents and name='ceges_adatok.db' and trashed=false"
@@ -145,18 +168,17 @@ def main():
             table_name = f"{house_key}_{report_type}"
             
             try:
-                file_id, file_name = get_latest_excel_file(service, folder_id)
+                file_id, file_name, mime_type = get_latest_excel_file(service, folder_id)
                 if not file_id:
-                    logging.warning(f"  ⚠️ Nem található Excel fájl ebben a mappában: [{table_name}] (Folder ID: {folder_id})")
+                    logging.warning(f"  ⚠️ ÜRES MAPPA! Nem található fájl ebben a mappában: [{table_name}] (Folder ID: {folder_id})")
                     missing_folders.append(table_name)
                     continue
 
                 sheet_to_load = SHEET_MAPPING.get(report_type, 0)
 
-                logging.info(f"  ➜ Feldolgozás: [{table_name}] <-- Fájl: '{file_name}' | Fül: '{sheet_to_load}'")
+                logging.info(f"  ➜ Megtalálva: [{table_name}] <-- Fájl: '{file_name}' | Fül: '{sheet_to_load}'")
                 
-                request = service.files().get_media(fileId=file_id)
-                excel_bytes = io.BytesIO(request.execute())
+                excel_bytes = download_file_bytes(service, file_id, mime_type)
                 
                 try:
                     df = pd.read_excel(excel_bytes, sheet_name=sheet_to_load)
@@ -167,14 +189,14 @@ def main():
 
                 df.to_sql(table_name, conn, if_exists="replace", index=False)
                 total_tables_created += 1
-                logging.info(f"     ✔ Tábla sikeresen frissítve: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
+                logging.info(f"     ✔ SQL Tábla sikeresen létrehozva: '{table_name}' ({len(df)} sor, {len(df.columns)} oszlop)")
 
             except Exception as e:
                 logging.error(f"  ❌ Hiba a(z) [{table_name}] feldolgozásakor: {e}")
 
     conn.close()
 
-    logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} / 35 TÁBLA SIKERESEN LÉTREHOZVA ===")
+    logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} / 35 TÁBLA LÉTREHOZVA ===")
     if missing_folders:
         logging.info(f"Üres/Hiányzó mappák listája: {missing_folders}")
 
