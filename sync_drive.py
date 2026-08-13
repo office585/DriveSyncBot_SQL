@@ -98,7 +98,10 @@ HOUSES_MAPPING = {
         "felhomatrac_2026": "102qpagWkmb8j9NO7IU93D6qTVVYdBGKt",
         "payout_report": "1QSxQSYv6vKByO4zp8-MsswpSfkT5em7_",
         "payment_report": "1K0SeRyibeikLr9giUWgOQr5YlxncEvr4",
-        "resrev_report": "1byLJxJlTywGIjisMscG3FpO76ZCjo53q"
+        "resrev_report": "1byLJxJlTywGIjisMscG3FpO76ZCjo53q",
+        # TEYA MEGOSZTOTT MAPPA ÉS A KÉT MASTER RIPORT
+        "teya_master_osszegzes": "0AP3HkLh_ANsVUk9PVA",
+        "teya_master_nyers": "0AP3HkLh_ANsVUk9PVA"
     }
 }
 
@@ -127,17 +130,25 @@ def get_drive_service():
 
 
 # ==============================================================================
-# LEGFRISSEBB FÁJL KERESÉSE
+# LEGFRISSEBB FÁJL KERESÉSE (KÖZÖS MEGHAJTÓK TÁMOGATÁSÁVAL)
 # ==============================================================================
 
-def get_latest_excel_file(service, folder_id):
+def get_latest_excel_file(service, folder_id, report_type=""):
     query = f"'{folder_id}' in parents and trashed=false"
+
+    # Teya Master fájlok specifikus szűrése, hogy ne a napi fájlokat válassza ki
+    if report_type == "teya_master_osszegzes":
+        query += " and name contains 'MASTER_Osszegzes'"
+    elif report_type == "teya_master_nyers":
+        query += " and name contains 'MASTER_Nyers'"
 
     results = service.files().list(
         q=query,
         orderBy="modifiedTime desc",
         pageSize=50,
-        fields="files(id, name, mimeType, modifiedTime)"
+        fields="files(id, name, mimeType, modifiedTime)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
     ).execute()
 
     files = results.get("files", [])
@@ -188,7 +199,10 @@ def download_file_bytes(service, file_id, mime_type):
             )
         )
     else:
-        request = service.files().get_media(fileId=file_id)
+        request = service.files().get_media(
+            fileId=file_id,
+            supportsAllDrives=True
+        )
 
     return io.BytesIO(request.execute())
 
@@ -198,25 +212,6 @@ def download_file_bytes(service, file_id, mime_type):
 # ==============================================================================
 
 def find_exact_sheet_name(sheet_names, required_sheet_name):
-    """
-    Pontos lapnevet keres.
-
-    A kis- és nagybetű nem számít, illetve a lapnév elején és végén
-    lévő felesleges szóközöket figyelmen kívül hagyja.
-
-    Például:
-        Card payments
-        card payments
-        CARD PAYMENTS
-
-    ugyanannak számít.
-
-    Viszont ezek már nem megfelelőek:
-        Card payment
-        Card payments 2026
-        Payments
-    """
-
     required_normalized = required_sheet_name.strip().lower()
 
     for sheet_name in sheet_names:
@@ -233,25 +228,6 @@ def find_exact_sheet_name(sheet_names, required_sheet_name):
 # ==============================================================================
 
 def load_payment_report_sheets(excel_bytes):
-    """
-    A Payment Report fájlból pontosan ezt a két lapot olvassa be:
-
-    1. Card payments
-    2. External payments
-
-    Visszatérés:
-        {
-            "payment_report": {
-                "dataframe": Card payments adatai,
-                "sheet_name": tényleges lapnév
-            },
-            "external_payments": {
-                "dataframe": External payments adatai,
-                "sheet_name": tényleges lapnév
-            }
-        }
-    """
-
     excel_bytes.seek(0)
 
     try:
@@ -396,7 +372,7 @@ def load_excel_smart(excel_bytes, report_type):
             target_sheet = sheet_names[0]
 
     # --------------------------------------------------------------------------
-    # MINDEN MÁS RIPORT
+    # MINDEN MÁS RIPORT (BELEÉRTVE A TEYA MASTER FÁJLOKAT IS)
     # --------------------------------------------------------------------------
 
     else:
@@ -430,14 +406,14 @@ def save_dataframe_to_sql(dataframe, table_name, connection):
     )
 
     logging.info(
-        f"     ✔ SQL-tábla sikeresen létrehozva: "
+        f"      ✔ SQL-tábla sikeresen létrehozva: "
         f"'{table_name}' "
         f"({len(dataframe)} sor, {len(dataframe.columns)} oszlop)"
     )
 
 
 # ==============================================================================
-# SQLITE FELTÖLTÉSE VAGY FRISSÍTÉSE
+# SQLITE FELTÖLTÉSE VAGY FRISSÍTÉSE (KÖZÖS MEGHAJTÓK TÁMOGATÁSÁVAL)
 # ==============================================================================
 
 def upload_or_update_db(
@@ -453,7 +429,9 @@ def upload_or_update_db(
 
     results = service.files().list(
         q=query,
-        fields="files(id)"
+        fields="files(id)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
     ).execute()
 
     existing_files = results.get("files", [])
@@ -474,7 +452,8 @@ def upload_or_update_db(
 
         service.files().update(
             fileId=file_id,
-            media_body=media
+            media_body=media,
+            supportsAllDrives=True
         ).execute()
 
     else:
@@ -490,7 +469,8 @@ def upload_or_update_db(
         service.files().create(
             body=file_metadata,
             media_body=media,
-            fields="id"
+            fields="id",
+            supportsAllDrives=True
         ).execute()
 
 
@@ -553,13 +533,14 @@ def main():
                 file_id, file_name, mime_type = (
                     get_latest_excel_file(
                         service,
-                        folder_id
+                        folder_id,
+                        report_type
                     )
                 )
 
                 if not file_id:
                     logging.warning(
-                        "  ⚠️ Nem található fájl a mappában: "
+                        "   ⚠️ Nem található fájl a mappában: "
                         f"[{base_table_name}] "
                         f"(Folder ID: {folder_id})"
                     )
@@ -595,7 +576,7 @@ def main():
                     )
 
                     logging.info(
-                        f"  ➜ Megtalálva: "
+                        f"   ➜ Megtalálva: "
                         f"[{card_table_name}] "
                         f"<-- Fájl: '{file_name}' "
                         f"| Fül: '{card_result['sheet_name']}'"
@@ -622,7 +603,7 @@ def main():
                     )
 
                     logging.info(
-                        f"  ➜ Megtalálva: "
+                        f"   ➜ Megtalálva: "
                         f"[{external_table_name}] "
                         f"<-- Fájl: '{file_name}' "
                         f"| Fül: '{external_result['sheet_name']}'"
@@ -637,7 +618,7 @@ def main():
                     total_tables_created += 1
 
                 # ==============================================================
-                # MINDEN MÁS RIPORT
+                # MINDEN MÁS RIPORT (BELEÉRTVE A TEYA MASTER FÁJLOKAT IS)
                 # ==============================================================
 
                 else:
@@ -647,7 +628,7 @@ def main():
                     )
 
                     logging.info(
-                        f"  ➜ Megtalálva: "
+                        f"   ➜ Megtalálva: "
                         f"[{base_table_name}] "
                         f"<-- Fájl: '{file_name}' "
                         f"| Fül: '{used_sheet}'"
@@ -663,7 +644,7 @@ def main():
 
             except Exception as error:
                 logging.error(
-                    f"  ❌ Hiba a(z) "
+                    f"   ❌ Hiba a(z) "
                     f"[{base_table_name}] "
                     f"feldolgozásakor: {error}"
                 )
@@ -676,7 +657,11 @@ def main():
     # ÖSSZEGZÉS
     # --------------------------------------------------------------------------
 
-    expected_table_count = len(HOUSES_MAPPING) * 6
+    # Várható táblaszám dinamikus kiszámítása
+    expected_table_count = sum(
+        len(reports) + (1 if "payment_report" in reports else 0)
+        for reports in HOUSES_MAPPING.values()
+    )
 
     logging.info(
         f"\n=== MŰVELET ÖSSZEGZÉSE: "
