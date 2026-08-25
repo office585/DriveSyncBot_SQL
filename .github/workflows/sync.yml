@@ -1,9 +1,9 @@
-name: Hourly DriveSyncBot Job
+name: Daily DriveSyncBot Job
 
 on:
   schedule:
-    # Minden óra 00. percében automatikusan lefut a felhőben
-    - cron: '0 * * * *'
+    # Minden nap reggel 5:00-kor magyar idő szerint (nyári időszámítás alatt)
+    - cron: '0 3 * * *'
   # Kézi indítás lehetősége a GitHub felületén
   workflow_dispatch:
 
@@ -27,7 +27,6 @@ jobs:
 
     - name: Robot futtatása
       env:
-        # A Secret-ben tárolt JSON kulcs átadása a kódnak
         GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
       run: |
         python sync_drive.py
