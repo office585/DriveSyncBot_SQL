@@ -113,10 +113,10 @@ HOUSES_MAPPING = {
 
 
 # ==============================================================================
-# GOOGLE DRIVE KAPCSOLAT
+# GOOGLE DRIVE ÉS SHEETS KAPCSOLAT
 # ==============================================================================
 
-def get_drive_service():
+def get_google_services():
     gdrive_json_str = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
 
     if not gdrive_json_str:
@@ -131,7 +131,10 @@ def get_drive_service():
         scopes=["https://www.googleapis.com/auth/drive"]
     )
 
-    return build("drive", "v3", credentials=creds)
+    drive_service = build("drive", "v3", credentials=creds)
+    sheets_service = build("sheets", "v4", credentials=creds)
+    
+    return drive_service, sheets_service
 
 
 # ==============================================================================
@@ -183,32 +186,86 @@ def get_latest_excel_file(service, folder_id, report_type=""):
             )
 
     first_file = files[0]
-
-    return (
-        first_file["id"],
-        first_file["name"],
-        first_file.get("mimeType", "")
-    )
+    return (first_file["id"], first_file["name"], first_file.get("mimeType", ""))
 
 
 # ==============================================================================
-# FÁJL LETÖLTÉSE (CSV FORMÁTUM A MÉRETHATÁR ÁTLÉPÉSÉRE)
+# FÁJL LETÖLTÉSE (HAGYOMÁNYOS EXCEL/CSV ESETÉN)
 # ==============================================================================
 
 def download_file_bytes(service, file_id, mime_type):
-    if "google-apps.spreadsheet" in mime_type:
-        # A Google Sheetet CSV-ként kérjük le, így elkerüljük a 10MB-os XLSX korlátot
-        request = service.files().export_media(
-            fileId=file_id,
-            mimeType="text/csv"
-        )
-    else:
-        request = service.files().get_media(
-            fileId=file_id,
-            supportsAllDrives=True
-        )
-
+    request = service.files().get_media(
+        fileId=file_id,
+        supportsAllDrives=True
+    )
     return io.BytesIO(request.execute())
+
+
+# ==============================================================================
+# HATALMAS GOOGLE SHEETEK BEOLVASÁSA (API-VAL, DARABOLVA)
+# ==============================================================================
+
+def read_google_sheet_smart(sheets_service, spreadsheet_id, report_type):
+    sheet_metadata = sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheets = sheet_metadata.get('sheets', [])
+    
+    sheet_names = [s['properties']['title'] for s in sheets]
+    target_sheet_name = sheet_names[0]
+    sheet_index = 0
+
+    # Munkalap azonosítás logika (ha több fül van)
+    if report_type == "payout_report":
+        for idx, name in enumerate(sheet_names):
+            if name.strip().lower().startswith("payout"):
+                target_sheet_name = name
+                sheet_index = idx
+                break
+        else:
+            if len(sheet_names) >= 2:
+                target_sheet_name = sheet_names[1]
+                sheet_index = 1
+    elif report_type == "resrev_report":
+        if len(sheet_names) >= 3:
+            target_sheet_name = sheet_names[2]
+            sheet_index = 2
+        elif len(sheet_names) >= 2:
+            target_sheet_name = sheet_names[1]
+            sheet_index = 1
+
+    row_count = sheets[sheet_index]['properties']['gridProperties'].get('rowCount', 1000)
+    
+    all_values = []
+    chunk_size = 50000  # 50.000 soronként húzza le, így nem omlik össze a 180 ezernél sem!
+    
+    for start_row in range(1, row_count + 1, chunk_size):
+        end_row = min(start_row + chunk_size - 1, row_count)
+        range_str = f"'{target_sheet_name}'!{start_row}:{end_row}"
+        
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=range_str
+        ).execute()
+        
+        values = result.get('values', [])
+        if not values:
+            continue
+        all_values.extend(values)
+        
+    if not all_values:
+        return pd.DataFrame(), target_sheet_name
+        
+    # Oszlopok száma és normalizálás
+    headers = [str(h).strip() if h is not None else "" for h in all_values[0]]
+    max_cols = len(headers)
+    
+    data = []
+    for row in all_values[1:]:
+        # Ha a sor rövidebb az oszlopok számánál, feltöltjük üres értékekkel
+        padded = row + [None] * (max_cols - len(row))
+        data.append(padded[:max_cols])
+        
+    df = pd.DataFrame(data, columns=headers)
+    return df, target_sheet_name
 
 
 # ==============================================================================
@@ -217,13 +274,10 @@ def download_file_bytes(service, file_id, mime_type):
 
 def find_exact_sheet_name(sheet_names, required_sheet_name):
     required_normalized = required_sheet_name.strip().lower()
-
     for sheet_name in sheet_names:
         current_normalized = str(sheet_name).strip().lower()
-
         if current_normalized == required_normalized:
             return sheet_name
-
     return None
 
 
@@ -233,30 +287,24 @@ def find_exact_sheet_name(sheet_names, required_sheet_name):
 
 def load_payment_report_sheets(excel_bytes):
     excel_bytes.seek(0)
-
     try:
         excel_file = pd.ExcelFile(excel_bytes)
         sheet_names = excel_file.sheet_names
-
     except Exception as error:
-        raise ValueError(
-            f"A Payment Report fájlt nem sikerült Excel-fájlként megnyitni: {error}"
-        )
+        raise ValueError(f"A Payment Report fájlt nem sikerült Excelként megnyitni: {error}")
 
     card_sheet = find_exact_sheet_name(sheet_names, "Card payments")
     external_sheet = find_exact_sheet_name(sheet_names, "External payments")
 
     missing_sheets = []
-    if card_sheet is None:
-        missing_sheets.append("Card payments")
-    if external_sheet is None:
-        missing_sheets.append("External payments")
+    if card_sheet is None: missing_sheets.append("Card payments")
+    if external_sheet is None: missing_sheets.append("External payments")
 
     if missing_sheets:
         available_sheets = ", ".join(str(name) for name in sheet_names)
         missing_text = ", ".join(missing_sheets)
         raise ValueError(
-            f"Hiányzó kötelező Payment Report lap: {missing_text}. A fájlban található lapok: {available_sheets}"
+            f"Hiányzó Payment Report lap: {missing_text}. Talált lapok: {available_sheets}"
         )
 
     excel_bytes.seek(0)
@@ -266,25 +314,17 @@ def load_payment_report_sheets(excel_bytes):
     external_df = pd.read_excel(excel_bytes, sheet_name=external_sheet)
 
     return {
-        "payment_report": {
-            "dataframe": card_df,
-            "sheet_name": str(card_sheet)
-        },
-        "external_payments": {
-            "dataframe": external_df,
-            "sheet_name": str(external_sheet)
-        }
+        "payment_report": {"dataframe": card_df, "sheet_name": str(card_sheet)},
+        "external_payments": {"dataframe": external_df, "sheet_name": str(external_sheet)}
     }
 
 
 # ==============================================================================
-# EGYÉB RIPORTOK BEOLVASÁSA (EXCEL ÉS CSV TÁMOGATÁS)
+# EGYÉB RIPORTOK BEOLVASÁSA (CSAK NEM GOOGLE SHEET FÁJLOKNÁL)
 # ==============================================================================
 
 def load_excel_smart(excel_bytes, report_type):
     excel_bytes.seek(0)
-
-    # Először megpróbáljuk Excelként beolvasni, ha nem megy (mert pl. CSV), akkor CSV-ként
     try:
         excel_file = pd.ExcelFile(excel_bytes)
         sheet_names = excel_file.sheet_names
@@ -354,46 +394,24 @@ def save_dataframe_to_sql(dataframe, table_name, connection):
 
 def upload_or_update_db(service, local_file_path, target_folder_id):
     query = (
-        f"'{target_folder_id}' in parents "
-        "and name='ceges_adatok.db' "
-        "and trashed=false"
+        f"'{target_folder_id}' in parents and name='ceges_adatok.db' and trashed=false"
     )
 
     results = service.files().list(
-        q=query,
-        fields="files(id)",
-        supportsAllDrives=True,
-        includeItemsFromAllDrives=True
+        q=query, fields="files(id)", supportsAllDrives=True, includeItemsFromAllDrives=True
     ).execute()
 
     existing_files = results.get("files", [])
-
-    media = MediaFileUpload(
-        local_file_path,
-        mimetype="application/x-sqlite3",
-        resumable=True
-    )
+    media = MediaFileUpload(local_file_path, mimetype="application/x-sqlite3", resumable=True)
 
     if existing_files:
         file_id = existing_files[0]["id"]
         logging.info(f"Drive-on lévő adatbázisfájl frissítése (ID: {file_id})...")
-        service.files().update(
-            fileId=file_id,
-            media_body=media,
-            supportsAllDrives=True
-        ).execute()
+        service.files().update(fileId=file_id, media_body=media, supportsAllDrives=True).execute()
     else:
         logging.info("Új adatbázisfájl feltöltése a célmappába...")
-        file_metadata = {
-            "name": "ceges_adatok.db",
-            "parents": [target_folder_id]
-        }
-        service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id",
-            supportsAllDrives=True
-        ).execute()
+        file_metadata = {"name": "ceges_adatok.db", "parents": [target_folder_id]}
+        service.files().create(body=file_metadata, media_body=media, fields="id", supportsAllDrives=True).execute()
 
 
 # ==============================================================================
@@ -404,7 +422,7 @@ def main():
     logging.info("=== MULTITENANT DRIVESYNCBOT INDÍTÁSA ===")
 
     try:
-        service = get_drive_service()
+        drive_service, sheets_service = get_google_services()
     except Exception as error:
         logging.error(f"Autentikációs hiba: {error}")
         return
@@ -416,7 +434,6 @@ def main():
             logging.warning(f"A korábbi helyi adatbázist nem sikerült törölni: {error}")
 
     connection = sqlite3.connect(LOCAL_DB_NAME)
-
     total_tables_created = 0
     missing_folders = []
     failed_reports = []
@@ -429,9 +446,7 @@ def main():
 
             try:
                 file_id, file_name, mime_type = get_latest_excel_file(
-                    service,
-                    folder_id,
-                    report_type
+                    drive_service, folder_id, report_type
                 )
 
                 if not file_id:
@@ -441,43 +456,59 @@ def main():
                     missing_folders.append(base_table_name)
                     continue
 
-                excel_bytes = download_file_bytes(
-                    service,
-                    file_id,
-                    mime_type
-                )
-
-                if report_type == "payment_report":
-                    payment_sheets = load_payment_report_sheets(excel_bytes)
-
-                    card_result = payment_sheets["payment_report"]
-                    card_table_name = f"{house_key}_payment_report"
-                    logging.info(
-                        f"    ➜ Megtalálva: [{card_table_name}] <-- Fájl: '{file_name}' | Fül: '{card_result['sheet_name']}'"
+                # ==============================================================
+                # 1. HA A FÁJL EGY NATÍV GOOGLE SHEET (NINCS MÉRETKORLÁT!)
+                # ==============================================================
+                if mime_type == "application/vnd.google-apps.spreadsheet":
+                    logging.info(f"    ➜ Hatalmas Google Sheet észlelve (API letöltés darabokban): {file_name}")
+                    
+                    dataframe, used_sheet = read_google_sheet_smart(
+                        sheets_service, file_id, report_type
                     )
-                    save_dataframe_to_sql(card_result["dataframe"], card_table_name, connection)
-                    total_tables_created += 1
-
-                    external_result = payment_sheets["external_payments"]
-                    external_table_name = f"{house_key}_external_payments"
-                    logging.info(
-                        f"    ➜ Megtalálva: [{external_table_name}] <-- Fájl: '{file_name}' | Fül: '{external_result['sheet_name']}'"
-                    )
-                    save_dataframe_to_sql(external_result["dataframe"], external_table_name, connection)
-                    total_tables_created += 1
-
-                else:
-                    dataframe, used_sheet = load_excel_smart(excel_bytes, report_type)
+                    
                     logging.info(
                         f"    ➜ Megtalálva: [{base_table_name}] <-- Fájl: '{file_name}' | Fül: '{used_sheet}'"
                     )
                     save_dataframe_to_sql(dataframe, base_table_name, connection)
                     total_tables_created += 1
 
+                # ==============================================================
+                # 2. HA A FÁJL HAGYOMÁNYOS EXCEL (.XLSX) VAGY CSV
+                # ==============================================================
+                else:
+                    excel_bytes = download_file_bytes(
+                        drive_service, file_id, mime_type
+                    )
+
+                    if report_type == "payment_report":
+                        payment_sheets = load_payment_report_sheets(excel_bytes)
+
+                        card_result = payment_sheets["payment_report"]
+                        card_table_name = f"{house_key}_payment_report"
+                        logging.info(
+                            f"    ➜ Megtalálva: [{card_table_name}] <-- Fájl: '{file_name}' | Fül: '{card_result['sheet_name']}'"
+                        )
+                        save_dataframe_to_sql(card_result["dataframe"], card_table_name, connection)
+                        total_tables_created += 1
+
+                        external_result = payment_sheets["external_payments"]
+                        external_table_name = f"{house_key}_external_payments"
+                        logging.info(
+                            f"    ➜ Megtalálva: [{external_table_name}] <-- Fájl: '{file_name}' | Fül: '{external_result['sheet_name']}'"
+                        )
+                        save_dataframe_to_sql(external_result["dataframe"], external_table_name, connection)
+                        total_tables_created += 1
+
+                    else:
+                        dataframe, used_sheet = load_excel_smart(excel_bytes, report_type)
+                        logging.info(
+                            f"    ➜ Megtalálva: [{base_table_name}] <-- Fájl: '{file_name}' | Fül: '{used_sheet}'"
+                        )
+                        save_dataframe_to_sql(dataframe, base_table_name, connection)
+                        total_tables_created += 1
+
             except Exception as error:
-                logging.error(
-                    f"    ❌ Hiba a(z) [{base_table_name}] feldolgozásakor: {error}"
-                )
+                logging.error(f"    ❌ Hiba a(z) [{base_table_name}] feldolgozásakor: {error}")
                 failed_reports.append(base_table_name)
 
     connection.close()
@@ -487,9 +518,7 @@ def main():
         for reports in HOUSES_MAPPING.values()
     )
 
-    logging.info(
-        f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} / {expected_table_count} TÁBLA LÉTREHOZVA ==="
-    )
+    logging.info(f"\n=== MŰVELET ÖSSZEGZÉSE: {total_tables_created} / {expected_table_count} TÁBLA LÉTREHOZVA ===")
 
     if missing_folders:
         logging.info(f"Üres vagy hiányzó mappák listája: {missing_folders}")
@@ -500,7 +529,7 @@ def main():
     logging.info("=== SQLITE FÁJL FELTÖLTÉSE A GOOGLE DRIVE CÉLMAPPÁBA ===")
 
     try:
-        upload_or_update_db(service, LOCAL_DB_NAME, TARGET_DB_FOLDER_ID)
+        upload_or_update_db(drive_service, LOCAL_DB_NAME, TARGET_DB_FOLDER_ID)
         logging.info("=== FOLYAMAT SIKERESEN BEFEJEZŐDÖTT ===")
     except Exception as error:
         logging.error(f"Hiba a feltöltés során: {error}")
