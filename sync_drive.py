@@ -415,6 +415,95 @@ def upload_or_update_db(service, local_file_path, target_folder_id):
 
 
 # ==============================================================================
+# ÚJ: ELLENŐRZÖTT ADATBÁZIS FELTÖLTÉSE A WEBOLDAL BUCKETJÉBE
+# ==============================================================================
+
+def upload_complete_db_to_bucket(local_file_path, missing_folders, failed_reports,
+                                 total_tables_created, expected_table_count):
+    from pathlib import Path
+    from google.cloud import storage
+    from google.api_core.exceptions import NotFound
+    from google.cloud.storage.retry import DEFAULT_RETRY_IF_GENERATION_SPECIFIED
+
+    if missing_folders or failed_reports or total_tables_created != expected_table_count:
+        raise RuntimeError(
+            "Bucketfeltöltés kihagyva: nem készült el minden riport. "
+            "A bucket korábbi adatbázisa változatlan maradt. "
+            f"Elkészült: {total_tables_created}/{expected_table_count}; "
+            f"hiányzó: {missing_folders}; hibás: {failed_reports}"
+        )
+
+    path = Path(local_file_path).resolve()
+    if not path.is_file() or path.stat().st_size == 0:
+        raise RuntimeError("Bucketfeltöltés kihagyva: nincs kész adatbázisfájl.")
+
+    expected_tables = {
+        f"{house}_{report}"
+        for house, reports in HOUSES_MAPPING.items()
+        for report in reports
+    }
+    expected_tables.update(
+        f"{house}_external_payments"
+        for house, reports in HOUSES_MAPPING.items()
+        if "payment_report" in reports
+    )
+    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    try:
+        if db.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
+            raise RuntimeError("Bucketfeltöltés kihagyva: sérült SQLite-adatbázis.")
+        actual_tables = {
+            row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        missing_tables = expected_tables - actual_tables
+        if missing_tables:
+            raise RuntimeError(
+                "Bucketfeltöltés kihagyva: hiányzó SQL-táblák: "
+                + ", ".join(sorted(missing_tables))
+            )
+    finally:
+        db.close()
+
+    # Ugyanaz a GitHub-secret; a Drive hitelesítése változatlan marad.
+    credentials = Credentials.from_service_account_info(
+        json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_JSON"]),
+        scopes=["https://www.googleapis.com/auth/devstorage.read_write"]
+    )
+    client = storage.Client(
+        project="high-function-506809-u4", credentials=credentials
+    )
+    try:
+        blob = client.bucket("ceges-adatok-450523117711").blob(
+            "ceges_adatok.db", chunk_size=8 * 1024 * 1024
+        )
+        try:
+            blob.reload(timeout=60)
+            previous_generation = int(blob.generation)
+        except NotFound:
+            previous_generation = 0
+
+        blob.cache_control = "no-cache, max-age=0"
+        logging.info("Bucketfeltöltés indul: %.1f MB", path.stat().st_size / 1024**2)
+        # Nincs előzetes törlés; a kész új objektum váltja le a régit.
+        # Ha közben más frissítette, a generációfeltétel leállítja a felülírást.
+        blob.upload_from_filename(
+            str(path),
+            content_type="application/x-sqlite3",
+            if_generation_match=previous_generation,
+            checksum="crc32c",
+            timeout=300,
+            retry=DEFAULT_RETRY_IF_GENERATION_SPECIFIED,
+        )
+        logging.info(
+            "BUCKET FRISSÍTVE: gs://ceges-adatok-450523117711/ceges_adatok.db "
+            "| generáció: %s", blob.generation
+        )
+    finally:
+        client.close()
+
+
+# ==============================================================================
 # FŐPROGRAM
 # ==============================================================================
 
@@ -528,11 +617,21 @@ def main():
 
     logging.info("=== SQLITE FÁJL FELTÖLTÉSE A GOOGLE DRIVE CÉLMAPPÁBA ===")
 
+    drive_upload_succeeded = False
     try:
         upload_or_update_db(drive_service, LOCAL_DB_NAME, TARGET_DB_FOLDER_ID)
+        drive_upload_succeeded = True
         logging.info("=== FOLYAMAT SIKERESEN BEFEJEZŐDÖTT ===")
     except Exception as error:
         logging.error(f"Hiba a feltöltés során: {error}")
+
+    # Új lépés: csak lezárt, teljes adatbázist publikálunk a weboldalnak.
+    if not drive_upload_succeeded:
+        raise RuntimeError("A Drive-feltöltés hibás; bucketfeltöltés nem történt.")
+    upload_complete_db_to_bucket(
+        LOCAL_DB_NAME, missing_folders, failed_reports,
+        total_tables_created, expected_table_count
+    )
 
 
 # ==============================================================================
