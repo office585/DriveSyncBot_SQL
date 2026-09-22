@@ -2,10 +2,14 @@ name: Daily DriveSyncBot Job
 
 on:
   schedule:
-    # Minden nap reggel 5:00-kor magyar idő szerint (nyári időszámítás alatt)
+    # 03:00 UTC: nyáron 05:00, télen 04:00 magyar idő szerint.
     - cron: '0 3 * * *'
-  # Kézi indítás lehetősége a GitHub felületén
   workflow_dispatch:
+
+# Ne fusson egyszerre két adatbázis-építés/feltöltés.
+concurrency:
+  group: daily-drivesyncbot
+  cancel-in-progress: false
 
 jobs:
   run-sync-bot:
@@ -24,6 +28,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install 'google-cloud-storage>=3.0,<4.0' 'google-crc32c>=1.5,<2.0'
 
     - name: Robot futtatása
       env:
