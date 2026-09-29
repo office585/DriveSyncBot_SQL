@@ -43,11 +43,13 @@ TARGET_DB_FOLDER_ID = "1qqL-xyNBbWVFgFLxBeTX3EKjd7vjiRbR"
 # ==============================================================================
 # MULTITENANT MAPPA MAPPING
 # ==============================================================================
+# A "felhomatrac_2026" kulcs megmaradt, hogy az SQL táblanevek ne változzanak, 
+# de az ID-k az új forrásmappákra mutatnak!
 
 HOUSES_MAPPING = {
     "athenaeum": {
         "szamlazz_hu_2026": "16KYmZhM-F08ZNHj-3VQf1TZXszHki1Cf",
-        "felhomatrac_2026": "19bo5GiU6lrPEgfrSbJrO74e7pWD9Ng7U",
+        "felhomatrac_2026": "1csbWwsozQLYFl_nPW7EhfZGU10HGDoNI",
         "payout_report": "11HFdIpgeEIPKR2hAguigkhCVa7aYOOYe",
         "payment_report": "1KGd5i9yH9UxJw6yTSveZBpbwwaS3Hj6_",
         "resrev_report": "1Kabe1R7ADsqtoVyRb-sgGead7k9lZWJs",
@@ -56,7 +58,7 @@ HOUSES_MAPPING = {
 
     "buda_castle": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "1xk3SOqhKWNPbRMkgZM1JleGwgYHN8p2K",
+        "felhomatrac_2026": "1cEkU2YKTzpU7eF-suiqEt_tLxGa9xfPj",
         "payout_report": "1YW3v3__H92zsHrT1zQZreV9q9FsYYe23",
         "payment_report": "1SaF84GEvQlr8xN2R6KF1uOnhFayPVc_D",
         "resrev_report": "1XkgOWmQYlXFPp0saa6RJDnAOQIFE3TUA",
@@ -65,7 +67,7 @@ HOUSES_MAPPING = {
 
     "soho": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "1fz1PwvGgmam-vZpg9SF3chn7s4ujTUYf",
+        "felhomatrac_2026": "1lLDVSA3T01QcbWkFClSqTMms0gl32LsL",
         "payout_report": "1avEyXVFme4VXLLsopnmyLIcAwFkH6g0L",
         "payment_report": "1QD0ngN0Fa5vzmk7NrkszNsk3LjzV0DS3",
         "resrev_report": "1JL8FmlUR_NLwTN4PLwaNfxomnqqO3Chy",
@@ -74,7 +76,7 @@ HOUSES_MAPPING = {
 
     "central": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "1OlJCdki0z-TC1lrewUrL4f0nPzGAbpwO",
+        "felhomatrac_2026": "10voHOY0WaczPk6b7HlLMa-GP8e5_tBX1",
         "payout_report": "1u0lE84uJkrMNlswgHNXxtB7hFxhPlH2I",
         "payment_report": "1TRgDr2i_JrE36GQAqQ6xsTG_k4q6V0QL",
         "resrev_report": "105N_EKgndLbD-5IcHnbTLj0tVSTNzqO2",
@@ -83,7 +85,7 @@ HOUSES_MAPPING = {
 
     "downtown": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "1HjE1CMPEIYHqG6HA7aPc5OqG0GAfHdXU",
+        "felhomatrac_2026": "1fOUaso_EGOEzNavlsljJgW5Y9vArZJ5m",
         "payout_report": "1aFa3J4vAYAenmM2y9OwHrLfoM4eTM6E4",
         "payment_report": "1VVu8IXHmx9kFuo82Z-h7mvdvrrYfAiYQ",
         "resrev_report": "1A3n-svd06K3ML0SW59fnGlgpvFaOWH-m",
@@ -92,7 +94,7 @@ HOUSES_MAPPING = {
 
     "vintage": {
         "szamlazz_hu_2026": "1Se15CyfmRcECnOxCjOCLDK_EsEcikmBL",
-        "felhomatrac_2026": "1WWJ3dhu1yw2Lfw3ZxqTqaRtLsjLmg1ac",
+        "felhomatrac_2026": "18E61Wxxw2bdqSJJ5YMRuiDTnoFlT2EOU",
         "payout_report": "1hwWmPVt7aUiwHuOwTX0To8rF6fz2LzBb",
         "payment_report": "1IgjazIli9Kxn807Nyl4N_5xOfFObaXfI",
         "resrev_report": "15nEFtJGFDVNuhRzYMa_H1L5dj8o2ROZG",
@@ -101,7 +103,7 @@ HOUSES_MAPPING = {
 
     "amberlyn": {
         "szamlazz_hu_2026": "1jU3BiAy-iRgz3xvv0uFDu5WTeWqFFtj3",
-        "felhomatrac_2026": "102qpagWkmb8j9NO7IU93D6qTVVYdBGKt",
+        "felhomatrac_2026": "1f1TOTkZnAw91cwnwp4-NkhFfXIywsSje",
         "payout_report": "1QSxQSYv6vKByO4zp8-MsswpSfkT5em7_",
         "payment_report": "1K0SeRyibeikLr9giUWgOQr5YlxncEvr4",
         "resrev_report": "1byLJxJlTywGIjisMscG3FpO76ZCjo53q",
@@ -213,7 +215,6 @@ def read_google_sheet_smart(sheets_service, spreadsheet_id, report_type):
     target_sheet_name = sheet_names[0]
     sheet_index = 0
 
-    # Munkalap azonosítás logika (ha több fül van)
     if report_type == "payout_report":
         for idx, name in enumerate(sheet_names):
             if name.strip().lower().startswith("payout"):
@@ -235,7 +236,7 @@ def read_google_sheet_smart(sheets_service, spreadsheet_id, report_type):
     row_count = sheets[sheet_index]['properties']['gridProperties'].get('rowCount', 1000)
     
     all_values = []
-    chunk_size = 50000  # 50.000 soronként húzza le, így nem omlik össze a 180 ezernél sem!
+    chunk_size = 50000  
     
     for start_row in range(1, row_count + 1, chunk_size):
         end_row = min(start_row + chunk_size - 1, row_count)
@@ -254,13 +255,11 @@ def read_google_sheet_smart(sheets_service, spreadsheet_id, report_type):
     if not all_values:
         return pd.DataFrame(), target_sheet_name
         
-    # Oszlopok száma és normalizálás
     headers = [str(h).strip() if h is not None else "" for h in all_values[0]]
     max_cols = len(headers)
     
     data = []
     for row in all_values[1:]:
-        # Ha a sor rövidebb az oszlopok számánál, feltöltjük üres értékekkel
         padded = row + [None] * (max_cols - len(row))
         data.append(padded[:max_cols])
         
@@ -369,6 +368,30 @@ def load_excel_smart(excel_bytes, report_type):
 
 
 # ==============================================================================
+# ÚJ FORRÁS: OSZLOPOK SZŰRÉSE ÉS ÁTRENDEZÉSE (A, E, B, G)
+# ==============================================================================
+
+def format_new_source_df(df):
+    """
+    Kiválogatja és sorba rendezi a szükséges oszlopokat a korábbi Felhőmatrac helyett érkező fájlból.
+    Kért leképezés (0-tól indexelve az oszlopokat):
+    1. SQL oszlop <- A oszlop (index: 0)
+    2. SQL oszlop <- E oszlop (index: 4)
+    3. SQL oszlop <- B oszlop (index: 1)
+    4. SQL oszlop <- G oszlop (index: 6)
+    """
+    if df.shape[1] >= 7:
+        # Csak ezeket az oszlopindexeket tartjuk meg, ebben a sorrendben
+        df = df.iloc[:, [0, 4, 1, 6]]
+        return df
+    else:
+        logging.warning(f"  ⚠️ Az új forrásfájlnak csak {df.shape[1]} oszlopa van a várt minimum 7 helyett!")
+        # Fallback: Kimentjük amit tudunk, ami túllóg az indexen, azt kihagyjuk.
+        safe_cols = [i for i in [0, 4, 1, 6] if i < df.shape[1]]
+        return df.iloc[:, safe_cols]
+
+
+# ==============================================================================
 # DATAFRAME MENTÉSE SQL-TÁBLÁBA
 # ==============================================================================
 
@@ -415,7 +438,7 @@ def upload_or_update_db(service, local_file_path, target_folder_id):
 
 
 # ==============================================================================
-# ÚJ: ELLENŐRZÖTT ADATBÁZIS FELTÖLTÉSE A WEBOLDAL BUCKETJÉBE
+# BUCKET FELTÖLTÉS
 # ==============================================================================
 
 def upload_complete_db_to_bucket(local_file_path, missing_folders, failed_reports,
@@ -465,7 +488,6 @@ def upload_complete_db_to_bucket(local_file_path, missing_folders, failed_report
     finally:
         db.close()
 
-    # Ugyanaz a GitHub-secret; a Drive hitelesítése változatlan marad.
     credentials = Credentials.from_service_account_info(
         json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_JSON"]),
         scopes=["https://www.googleapis.com/auth/devstorage.read_write"]
@@ -485,8 +507,6 @@ def upload_complete_db_to_bucket(local_file_path, missing_folders, failed_report
 
         blob.cache_control = "no-cache, max-age=0"
         logging.info("Bucketfeltöltés indul: %.1f MB", path.stat().st_size / 1024**2)
-        # Nincs előzetes törlés; a kész új objektum váltja le a régit.
-        # Ha közben más frissítette, a generációfeltétel leállítja a felülírást.
         blob.upload_from_filename(
             str(path),
             content_type="application/x-sqlite3",
@@ -546,7 +566,7 @@ def main():
                     continue
 
                 # ==============================================================
-                # 1. HA A FÁJL EGY NATÍV GOOGLE SHEET (NINCS MÉRETKORLÁT!)
+                # 1. HA A FÁJL EGY NATÍV GOOGLE SHEET
                 # ==============================================================
                 if mime_type == "application/vnd.google-apps.spreadsheet":
                     logging.info(f"    ➜ Hatalmas Google Sheet észlelve (API letöltés darabokban): {file_name}")
@@ -555,6 +575,10 @@ def main():
                         sheets_service, file_id, report_type
                     )
                     
+                    # ÚJ: Oszlopok formázása, ha az új forrásfájlról van szó
+                    if report_type == "felhomatrac_2026":
+                        dataframe = format_new_source_df(dataframe)
+
                     logging.info(
                         f"    ➜ Megtalálva: [{base_table_name}] <-- Fájl: '{file_name}' | Fül: '{used_sheet}'"
                     )
@@ -590,6 +614,11 @@ def main():
 
                     else:
                         dataframe, used_sheet = load_excel_smart(excel_bytes, report_type)
+                        
+                        # ÚJ: Oszlopok formázása, ha az új forrásfájlról van szó
+                        if report_type == "felhomatrac_2026":
+                            dataframe = format_new_source_df(dataframe)
+                            
                         logging.info(
                             f"    ➜ Megtalálva: [{base_table_name}] <-- Fájl: '{file_name}' | Fül: '{used_sheet}'"
                         )
@@ -625,7 +654,6 @@ def main():
     except Exception as error:
         logging.error(f"Hiba a feltöltés során: {error}")
 
-    # Új lépés: csak lezárt, teljes adatbázist publikálunk a weboldalnak.
     if not drive_upload_succeeded:
         raise RuntimeError("A Drive-feltöltés hibás; bucketfeltöltés nem történt.")
     upload_complete_db_to_bucket(
